@@ -1,46 +1,60 @@
-var express = require('express');
-var router = express.Router();
+/* eslint-disable @typescript-eslint/no-var-requires */
+const express = require('express');
+const router = express.Router();
 
-router.post('/validate', function(req, res, next) {
-    const curp = req.body.curp;
-    const validationResult = isValidCurp(curp);
-
-    if (validationResult.valid) {
-        res.status(200).json(validationResult);
-    } else {
-        res.status(200).json({ valid: false });
-    }
-});
-
-
-
+// Validación mejorada de CURP
 function isValidCurp(curp) {
-    const regex = /^([A-Z]{1}[AEIOU]{1}[A-Z]{2})(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|1\d|2\d|3[0-1]))([HM]{1})(?:AS|BC|BS|CC|CH|CL|CM|CS|DF|DG|GR|GT|HG|JC|MC|MN|MS|NE|NL|NT|OC|PL|QR|SP|SL|SR|TC|TL|TS|VZ|YN|ZS|NE|DF){1}([B-DF-HJ-NP-TV-Z]{3})([A-Z\d]{2})$/;
-    const match = curp.match(regex);
+    if (!curp || typeof curp !== 'string') {
+        return { valid: false };
+    }
+
+    const regex = /^([A-Z][AEIOU][A-Z]{2})(\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01]))([HM])(AS|BC|BS|CC|CL|CM|CS|CH|DF|DG|GR|GT|HG|JC|MC|MN|MS|NT|NL|OC|PL|QT|QR|SP|SL|SR|TC|TS|TL|VZ|YN|ZS|NE)[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/;
+    const match = curp.toUpperCase().match(regex);
 
     if (!match) {
-        return false;
+        return { valid: false };
     }
 
-    const firstNameLetter = match[1];
-    const birthDateStr = match[2];
-    const sex = match[3] === "H" ? "Hombre" : "Mujer";
-    const birthDate = new Date(
-        parseInt(birthDateStr.slice(0, 2), 10) + 1900,
-        parseInt(birthDateStr.slice(2, 4), 10) - 1,
-        parseInt(birthDateStr.slice(4, 6), 10)
-    );
+    try {
+        const year = parseInt(match[2].substring(0, 2)) + 1900;
+        const month = parseInt(match[2].substring(2, 4)) - 1;
+        const day = parseInt(match[2].substring(4, 6));
+        
+        const birthDate = new Date(year, month, day);
+        if (isNaN(birthDate.getTime())) {
+            return { valid: false };
+        }
 
-    return {
-        valid: true,
-        firstNameLetter,
-        lastName1Letter: firstNameLetter[0],
-        lastName2Letter: firstNameLetter[1],
-        sex,
-        birthDate,
-    };
+        return {
+            valid: true,
+            firstNameLetter: match[1].charAt(0),
+            lastName1Letter: match[1].charAt(1),
+            lastName2Letter: match[1].charAt(2),
+            sex: match[4] === 'H' ? 'Hombre' : 'Mujer',
+            birthDate: birthDate.toISOString().split('T')[0], // Formato YYYY-MM-DD
+            state: match[5] // Estado de registro
+        };
+    } catch (error) {
+        return { valid: false };
+    }
 }
 
+// Ruta de validación
+router.post('/validate', (req, res) => {
+    try {
+        const { curp } = req.body;
+        
+        if (!curp) {
+            return res.status(400).json({ error: 'Se requiere el parámetro CURP' });
+        }
 
+        const result = isValidCurp(curp);
+        res.status(result.valid ? 200 : 400).json(result);
+        
+    } catch (error) {
+        console.error('Error validando CURP:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
 
 module.exports = router;
