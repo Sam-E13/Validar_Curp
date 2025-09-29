@@ -3,7 +3,7 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
-var cors = require('cors'); // Añade esta línea
+var cors = require('cors');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -11,16 +11,28 @@ var curpRouter = require('./routes/curp');
 
 var app = express();
 
-// Configuración de CORS 
+// Configuración de CORS para desarrollo y producción
+const allowedOrigins = [
+  'http://localhost:5173',           // Frontend local (Vite)
+  'http://localhost:3000',           // Otra posible configuración local
+  process.env.FRONTEND_URL           // URL del frontend en producción
+].filter(Boolean); // Elimina valores undefined
+
 app.use(cors({
-  origin: 'http://localhost:5173', // Permite frontend
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (como Postman, apps móviles, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true 
 }));
-
-// Opción alternativa para desarrollo (permite todos los orígenes)
-// app.use(cors());
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
